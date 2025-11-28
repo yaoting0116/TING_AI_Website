@@ -1,4 +1,4 @@
-# TING‑AI Media Web 🎵🖼️
+# TING AI Website 🎵🖼️
 
 ## Overview  
 TING‑AI is a simple yet powerful personal multimedia website built with Python/Flask (backend) and Vue.js (frontend).  
@@ -67,4 +67,5 @@ Then open your browser at `http://127.0.0.1:5000/`.
 * Place your **images** in `static/images/` → they will appear automatically on the homepage.
 * Place your **music files** (mp3 / wav / …) in `static/music/` → they will show up in the music playlist automatically.
 * Use the built-in UI to play music, control volume, skip tracks, shuffle, repeat, and browse the playlist. Works on desktop & mobile.
+
 
