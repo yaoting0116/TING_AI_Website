@@ -1,0 +1,47 @@
+/* static/css/responsive.css */
+
+/* 全域：圖片與 audio 自動縮放 */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+audio {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* 卡片圖片（若 template 有 .card-img-top）*/
+.card-img-top {
+  max-height: 220px;
+  object-fit: cover;
+}
+
+/* 列表項目與按鈕在手機上具備更大可點擊區 */
+.list-group-item, .btn {
+  -webkit-tap-highlight-color: rgba(0,0,0,0.06);
+  touch-action: manipulation;
+}
+
+/* container padding 微調（手機） */
+@media (max-width: 576px) {
+  body {
+    padding-left: 12px;
+    padding-right: 12px;
+    font-size: 15px;
+    line-height: 1.4;
+  }
+  .card-img-top { max-height: 180px; }
+}
+
+/* 若你的模板使用表格，讓表格在手機水平滾動 */
+.table-responsive {
+  overflow-x: auto;
+}
+
+/* 文字截斷在窄螢幕改為換行，不強制截斷 */
+.text-truncate {
+  white-space: normal !important;
+  overflow: visible !important;
+}

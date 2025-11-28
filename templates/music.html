@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TING-AI 音樂</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+    <style>
+        /* 保留你要求左側選單原本的排版設定 */
+        body {
+            background-image: url('{{% url_for('static', filename='2024-04-10_13-43-35_7375.png') %}}');
+            background-attachment: fixed;
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center;
+            margin: 0;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* ========== 左側選單（不要改動外觀） ========== */
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: -15%;
+            width: 15%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: left 0.3s ease;
+            z-index: 1000;
+        }
+        .navbar.show {
+            left: 0;
+        }
+        .navbar a {
+            color: white;
+            text-decoration: none;
+            margin: 15px 0;
+            padding: 10px 20px;
+            width: 100%;
+            text-align: center;
+            transition: background-color 0.3s;
+        }
+        .navbar a:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* ========== 主內容：桌機時預留左側空間，手機時移除 margin-left（避免跑掉） ========== */
+        .content {
+            margin-left: 15%;
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            position: relative;
+            box-sizing: border-box;
+            min-width: 0; /* 重要：避免 flex item overflow */
+        }
+
+        .toggle-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1001;
+            cursor: pointer;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px;
+            border: none;
+            outline: none;
+            font-size: 1rem;
+            transition: background-color 0.3s;
+        }
+        .toggle-btn:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* ========== 內容框架（改少量樣式，但不改功能） ========== */
+        .frame {
+            background-color: rgba(0, 0, 0, 0.8);
+            border: 2px solid lightgray;
+            padding: 20px;
+            border-radius: 10px;
+            width: 100%;
+            max-width: 800px;
+            margin: 20px 0;
+            box-sizing: border-box;
+            min-width: 0; /* 防止內部項目溢出 */
+        }
+
+        /* 將 table display 改為更穩定的 block/flex，避免在 flex container 下跑掉 */
+        .table-frame { width: 100%; text-align: left; margin-top: 20px; display: block; box-sizing: border-box; }
+        .table-row { display: block; box-sizing: border-box; }
+        .table-cell { display: block; padding: 10px; border-bottom: 1px solid lightgray; box-sizing: border-box; }
+
+        .player {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+            min-width: 0;
+        }
+
+        .controls-container {
+            display: flex;
+            justify-content: center; /* Center align the buttons */
+            align-items: center;
+            width: 100%;
+            margin-top: 10px;
+            position: relative;
+            flex-wrap: wrap;
+            box-sizing: border-box;
+        }
+        .controls {
+            display: flex;
+            justify-content: center; /* Center align the buttons */
+            align-items: center;
+        }
+        .controls button {
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            padding: 10px;
+            margin: 0 5px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            min-width: 40px; /* Ensure buttons have a consistent width */
+            width: 50px; /* Set a fixed width */
+            height: 50px; /* Set a fixed height */
+            display: flex;
+            justify-content: center; /* Center align content */
+            align-items: center; /* Center align content */
+            border-radius: 6px;
+        }
+        .controls button:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .progress-container {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            margin-top: 10px;
+            box-sizing: border-box;
+        }
+        .current-time, .total-time {
+            color: white;
+            font-size: 1rem;
+            margin: 0 10px;
+            min-width: 48px;
+            text-align: center;
+        }
+        .progress-bar {
+            flex: 1;
+            height: 5px;
+            background-color: rgba(255, 255, 255, 0.2);
+            margin: 0 10px;
+            cursor: pointer;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .progress-bar div {
+            height: 100%;
+            background-color: white;
+            width: 0%;
+        }
+
+        .volume-control {
+            position: absolute;
+            right: 0; /* Position to the right */
+            display: flex;
+            align-items: center;
+        }
+        .volume-control input[type="range"] {
+            margin-left: 10px;
+        }
+
+        /* 歌單：確保在窄螢幕可換行且不會造成橫向溢出 */
+        .song-list {
+            width: 100%;
+            text-align: left;
+            margin-top: 20px;
+            max-height: 180px; /* Limit the height to show only 6 songs */
+            overflow-y: auto; /* Enable vertical scroll */
+            box-sizing: border-box;
+        }
+        .song-list ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .song-list li {
+            padding: 10px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            display: flex;
+            justify-content: flex-start; /* 改成靠左排列 */
+            gap: 10px; /* 歌名和時間的間距 */
+            border-bottom: 1px solid lightgray;
+            white-space: nowrap; /* Prevent text wrapping on wide screens */
+            overflow: hidden; /* Hide overflow text */
+            text-overflow: ellipsis; /* Add ellipsis (...) for overflow text */
+            box-sizing: border-box;
+        }
+        .song-list li:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* ---------- 手機調整：不改左側選單樣式，但讓主內容不被推擠 ---------- */
+        @media (max-width: 768px) {
+            .content {
+                margin-left: 30px; /* 重要：在手機上移除左側 margin，避免主內容被推擠或溢出 */
+                padding-top: 60px; /* 預留 toggle 按鈕高度 */
+                
+            }
+            .toggle-btn { left: 12px; top: 12px; }
+
+            /* 歌單允許換行以避免過長字串造成溢出 */
+            .song-list li {
+                white-space: nowrap; /* 不換行 */
+                display: flex;
+                justify-content: space-between; /* 左右兩端對齊 */
+                align-items: center; /* 垂直置中 */
+                gap: 10px;
+                text-overflow: ellipsis;
+                overflow: hidden;
+            }
+            .song-list li > span {
+                font-size: 0.95rem;
+                color: rgba(255,255,255,0.85);
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            
+            .frame {
+                margin: 12px 10px;
+                padding: 14px;
+                max-width: 98%;
+            }
+
+            .frame h2 {
+                font-size: 1rem; /* 手機版字體稍小 */
+            }
+
+            .controls button {
+                height: 40px;
+                min-width: 36px;
+                margin: 0 4px;
+            }
+
+            .progress-container { gap: 6px; }
+            .volume-control { position: static; margin-left: auto; order: 2; width: 100%; justify-content: center; padding-right: 10px; }
+            .volume-control input[type="range"] { width: 100px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="container">
+        <div class="content">
+            <button class="toggle-btn" @click="toggleMenu">☰</button>
+            <nav class="navbar" :class="{ show: showNavbar }" id="navbar">
+                <a href="{{% url_for('music') %}}" @click="toggleMenu">音樂</a>
+                <a href="{{% url_for('game') %}}" @click="toggleMenu">遊戲</a>
+                <a href="{{% url_for('learning') %}}" @click="toggleMenu">學習</a>
+                <a href="{{% url_for('NLP') %}}" @click="toggleMenu">語言</a>
+                <a href="{{% url_for('index') %}}">主頁</a>
+            </nav>
+
+            <div class="frame">
+                <div class="table-frame">
+                    <div class="table-row">
+                        <div class="table-cell">
+                            歡迎來到 TING-AI 音樂播放器
+                        </div>
+                    </div>
+                    <div class="table-row">
+                        <div class="table-cell">
+                            這是一個使用 Vue.js 製作的音樂播放器
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="frame">
+                <div class="table-frame">
+                    <div class="table-row">
+                        <div class="table-cell">
+                            <h2>音樂清單</h2>
+                            <div class="song-list">
+                                <ul>
+                                    <!-- single click will select AND play (desktop & mobile consistent) -->
+                                    <li v-for="(song, index) in songs" :key="song.name" @click="selectSong(index)">
+                                        <div style="flex:1; min-width:0;">
+                                            <strong style="display:block; overflow:hidden; text-overflow:ellipsis;">
+                                                {{ song.name }}
+                                            </strong>
+                                            <!-- only show artist/album when at least one exists -->
+                                            <span v-if="song.artist || song.album">
+                                                {{ song.artist ? song.artist : '' }}{{ song.artist && song.album ? ' - ' : '' }}{{ song.album ? song.album : '' }}
+                                            </span>
+                                        </div>
+                                        <div style="margin-left:8px; white-space:nowrap; color: rgba(255,255,255,0.85);">
+                                            {{ formatTime(song.duration || 0) }}
+                                        </div>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-row">
+                        <div class="table-cell">
+                            <h2>音樂播放器⎛⎝ ≽ &gt; ⩊ &lt; ≼ ⎠⎞</h2>
+                            <div class="player" v-if="currentSong">
+                                <p style="margin:4px 0 12px 0;">{{ currentSong.name }}</p>
+                                <audio ref="audio" :src="currentSong.url"></audio>
+
+                                <div class="progress-container" v-if="currentSong && currentSong.duration">
+                                    <span class="current-time">{{ formatTime(currentTime) }}</span>
+                                    <div class="progress-bar" @click="seek" ref="progressBar">
+                                        <div :style="{ width: progress + '%' }"></div>
+                                    </div>
+                                    <span class="total-time">{{ formatTime(currentSong.duration || 0) }}</span>
+                                </div>
+
+                                <div class="controls-container">
+                                    <div class="controls">
+                                        <button @click="toggleShuffle">{{ isShuffle ? '⛌▷' : '⛌▶' }}</button>
+                                        <button @click="prevSong">❚◀︎</button>
+                                        <button @click="togglePlay">{{ isPlaying ? '❚❚' : '▶' }}</button>
+                                        <button @click="nextSong">▶︎❚</button>
+                                        <button @click="toggleRepeat">{{ isRepeat ? '⟳¹' : '⟳' }}</button>
+                                    </div>
+                                    <div class="volume-control">
+                                        <label for="volume">🔊</label>
+                                        <input type="range" id="volume" v-model="volume" min="0" max="1" step="0.01" @input="changeVolume">
+                                    </div>
+                                </div>
+                            </div>
+                            <div v-else class="text-muted">目前沒有音樂或尚未選取歌曲。</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        new Vue({
+            el: '#app',
+            data: {
+                showNavbar: false,
+                songs: {{% music_info %}},
+                currentSongIndex: 0,
+                isPlaying: false,
+                progress: 0,
+                volume: 0.33,
+                isRepeat: false,
+                isShuffle: false,
+                currentTime: 0,
+                _onTimeUpdate: null,
+                _onEnded: null
+            },
+            computed: {
+                currentSong() {
+                    return this.songs && this.songs.length ? this.songs[this.currentSongIndex] : null;
+                }
+            },
+            methods: {
+                toggleMenu() {
+                    this.showNavbar = !this.showNavbar;
+                },
+                // single click => select AND play (desktop & mobile consistent)
+                selectSong(index) {
+                    if (!this.songs || index < 0 || index >= this.songs.length) return;
+                    this.currentSongIndex = index;
+                    // wait for audio src to update
+                    this.$nextTick(() => {
+                        // reset progress and attempt to play (user gesture)
+                        this.resetProgress();
+                        this.play();
+                    });
+                },
+                play() {
+                    const audio = this.$refs.audio;
+                    if (!audio) return;
+                    // try to play, handle promise (some browsers block autoplay without gesture)
+                    audio.play().then(() => {
+                        this.isPlaying = true;
+                    }).catch(() => {
+                        this.isPlaying = false;
+                    });
+                },
+                pause() {
+                    const audio = this.$refs.audio;
+                    if (!audio) return;
+                    audio.pause();
+                    this.isPlaying = false;
+                },
+                togglePlay() {
+                    if (this.isPlaying) this.pause(); else this.play();
+                },
+                nextSong() {
+                    if (!this.songs || this.songs.length === 0) return;
+                    if (this.isShuffle) {
+                        this.currentSongIndex = Math.floor(Math.random() * this.songs.length);
+                    } else {
+                        this.currentSongIndex = (this.currentSongIndex + 1) % this.songs.length;
+                    }
+                    this.$nextTick(() => {
+                        this.resetProgress();
+                        this.checkAutoPlay();
+                    });
+                },
+                prevSong() {
+                    if (!this.songs || this.songs.length === 0) return;
+                    this.currentSongIndex = (this.currentSongIndex - 1 + this.songs.length) % this.songs.length;
+                    this.$nextTick(() => {
+                        this.resetProgress();
+                        this.checkAutoPlay();
+                    });
+                },
+                updateProgress() {
+                    const audio = this.$refs.audio;
+                    if (!audio) return;
+                    const dur = audio.duration;
+                    const cur = audio.currentTime || 0;
+                    if (!dur || isNaN(dur) || dur === Infinity) {
+                        this.progress = 0;
+                        this.currentTime = cur;
+                        return;
+                    }
+                    this.progress = (cur / dur) * 100;
+                    this.currentTime = cur;
+                },
+                seek(event) {
+                    const audio = this.$refs.audio;
+                    if (!audio || !audio.duration || isNaN(audio.duration)) return;
+                    const target = event.currentTarget || event.target;
+                    const rect = target.getBoundingClientRect();
+                    const offsetX = event.clientX - rect.left;
+                    const width = rect.width || 1;
+                    const percentage = Math.max(0, Math.min(1, offsetX / width));
+                    audio.currentTime = audio.duration * percentage;
+                    this.updateProgress();
+                },
+                changeVolume() {
+                    const audio = this.$refs.audio;
+                    if (!audio) return;
+                    audio.volume = this.volume;
+                },
+                toggleRepeat() {
+                    this.isRepeat = !this.isRepeat;
+                    const audio = this.$refs.audio;
+                    if (audio) audio.loop = this.isRepeat;
+                },
+                toggleShuffle() {
+                    this.isShuffle = !this.isShuffle;
+                },
+                formatTime(seconds) {
+                    seconds = Math.floor(seconds || 0);
+                    const minutes = Math.floor(seconds / 60);
+                    const secs = Math.floor(seconds % 60);
+                    return `${minutes}:${secs < 10 ? '0' : ''}${secs}`;
+                },
+                resetProgress() {
+                    this.progress = 0;
+                    this.currentTime = 0;
+                    const audio = this.$refs.audio;
+                    if (audio) {
+                        try { audio.pause(); audio.load(); } catch (e) { /* ignore */ }
+                    }
+                },
+                checkAutoPlay() {
+                    if (this.isPlaying) this.play(); else this.pause();
+                }
+            },
+            mounted() {
+                // attach audio listeners when audio element available
+                this.$nextTick(() => {
+                    const audio = this.$refs.audio;
+                    if (!audio) return;
+                    // bind once (store refs for removal)
+                    this._onTimeUpdate = this.updateProgress.bind(this);
+                    this._onEnded = () => {
+                        if (!this.isRepeat) this.nextSong();
+                        else {
+                            try { this.$refs.audio.play(); } catch (e) {}
+                        }
+                    };
+                    audio.addEventListener('timeupdate', this._onTimeUpdate);
+                    audio.addEventListener('ended', this._onEnded);
+                    try { audio.volume = this.volume; } catch (e) {}
+                });
+
+                // load metadata durations for songs (non-blocking)
+                if (Array.isArray(this.songs)) {
+                    this.songs.forEach((song, idx) => {
+                        if (!song || !song.url) return;
+                        const a = new Audio(song.url);
+                        a.addEventListener('loadedmetadata', () => {
+                            // set duration reactively
+                            try { this.$set(this.songs[idx], 'duration', a.duration); } catch (e) {}
+                        });
+                    });
+                }
+
+                // ensure currentSongIndex in range
+                if (!this.songs || this.songs.length === 0) {
+                    this.currentSongIndex = 0;
+                } else {
+                    this.currentSongIndex = Math.min(this.currentSongIndex, this.songs.length - 1);
+                }
+            },
+            beforeDestroy() {
+                // remove listeners safely
+                try {
+                    const audio = this.$refs.audio;
+                    if (audio) {
+                        if (this._onTimeUpdate) audio.removeEventListener('timeupdate', this._onTimeUpdate);
+                        if (this._onEnded) audio.removeEventListener('ended', this._onEnded);
+                    }
+                } catch (e) { /* ignore */ }
+                // restore body overflow
+                document.body.style.overflow = '';
+            }
+        });
+    </script>
+</body>
+</html>
