@@ -74,7 +74,8 @@ Then open your browser at `http://127.0.0.1:5000/`.
 
 ## Demo (Live Version) 🌐  
 You can see the live, deployed version of this site at:  
-[👉 Live Demo on Render]([https://your‑render‑subdomain.onrender.com](https://ting-ai-website.onrender.com/)  
-*(Replace `your‑render‑subdomain.onrender.com` with your actual Render URL)*
+[👉 Live Demo on Render]([TING_AI_Website](https://ting-ai-website.onrender.com/)  
+
+
 
 
