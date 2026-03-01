@@ -1,113 +1,577 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hant">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TING-AI 遊戲</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>TING-AI 遊戲 - 主角邊界修正</title>
     <style>
-        body {
-            background-image: url('{{ url_for('static', filename='2024-04-10_13-43-35_7375.png') }}');
+        html,body{
+            height:100%;
+            margin:0;
+            font-family: Arial, sans-serif;
+            color: white;
+            background-image: url('{{ url_for("static", filename="2024-04-10_13-43-35_7375.png") }}');
             background-attachment: fixed;
             background-size: cover;
             background-repeat: no-repeat;
             background-position: center;
-            margin: 0;
-            color: white;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
         }
-        .container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-        }
+
+        .container { display:flex; flex-direction:column; min-height:100vh; }
+
         .navbar {
-            position: fixed;
-            top: 0;
-            left: -15%;
-            width: 15%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            padding-top: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            transition: left 0.3s ease;
-            z-index: 1000;
+            position: fixed; top: 0; left: -15%; width: 15%; height: 100%;
+            background-color: rgba(0,0,0,0.7); padding-top: 20px; display:flex;
+            flex-direction: column; align-items:center; justify-content:center;
+            transition:left .3s; z-index:1000;
         }
-        .navbar.show {
-            left: 0;
-        }
-        .navbar a {
-            color: white;
-            text-decoration: none;
-            margin: 15px 0;
-            padding: 10px 20px;
-            width: 100%;
-            text-align: center;
-            transition: background-color 0.3s;
-        }
-        .navbar a:hover {
-            background-color: rgba(255, 255, 255, 0.2);
-        }
-        .content {
-            margin-left: 15%;
-            padding: 20px;
-            flex: 1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            position: relative;
-        }
+        .navbar.show { left:0; }
+        .navbar a { color:white; text-decoration:none; margin:15px 0; padding:10px 20px; width:100%; text-align:center; }
         .toggle-btn {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            z-index: 1001;
-            cursor: pointer;
-            background-color: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 10px;
-            border: none;
-            outline: none;
-            font-size: 1rem;
-            transition: background-color 0.3s;
+            position: fixed; top:20px; left:20px; z-index:1001; cursor:pointer;
+            background-color: rgba(0,0,0,0.7); color:white; padding:10px; border:none; font-size:1rem;
         }
-        .toggle-btn:hover {
-            background-color: rgba(255, 255, 255, 0.2);
+
+        .content { margin-left:15%; padding:20px; min-height:100vh; display:flex; justify-content:center; align-items:center; position:relative; }
+
+        /* 遊戲區塊：底色更深 */
+        #gameWrapper {
+            width: 85%;
+            max-width: 1100px;
+            aspect-ratio: 16/9;
+            background: rgba(0,0,0,0.8); /* 更暗 */
+            border-radius: 12px;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.7);
+            position: relative;
+            overflow: hidden;
+        }
+
+        canvas { width:100%; height:100%; display:block; background: transparent; touch-action:none; }
+
+        /* overlay（主選單 / 規則 / 暫停 / 結束）*/
+        .overlay {
+            position:absolute; inset:0; display:flex; flex-direction:column;
+            align-items:center; justify-content:center; gap:12px;
+            background: linear-gradient(180deg, rgba(0,0,0,0.9), rgba(0,0,0,0.8));
+            z-index: 120; padding:20px; text-align:center;
+        }
+        .menu-btn {
+            padding:12px 28px; border-radius:12px; background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12); color:white; font-size:18px; cursor:pointer;
+        }
+        .menu-btn.secondary { font-size:15px; padding:10px 20px; }
+        .menu-btn.big { padding:14px 30px; font-size:20px; border-radius:14px; }
+
+        .rules-box { max-width:820px; max-height:78%; overflow:auto; background: rgba(0,0,0,0.72); padding:14px; border-radius:10px; border:1px solid rgba(255,255,255,0.06); text-align:left; }
+
+        /* HUD: 左 (分數、吃了 top) */
+        .hud-left {
+            position:absolute; top:10px; left:10px; z-index:110; display:flex; gap:12px; align-items:center; font-weight:600;
+        }
+        .hud-left .panel { background: rgba(0,0,0,0.55); padding:8px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.06); }
+
+        /* HUD: 右上 (生命 top + 暫停按鈕) */
+        .hud-right {
+            position:absolute; top:10px; right:10px; z-index:110; display:flex; gap:10px; align-items:center;
+        }
+        .hud-right .panel {
+            background: rgba(0,0,0,0.55);
+            padding:6px 8px;
+            border-radius:8px; border:1px solid rgba(255,255,255,0.06); font-weight:600;
+            display:flex; align-items:center; gap:6px;
+        }
+        .hud-right .panel button {
+            padding:6px 10px;
+            font-size:14px;
+            border-radius:8px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.08);
+            color: white;
+            cursor: pointer;
+        }
+
+        /* mobile bottom HUD elements (hidden on desktop) */
+        .hud-bottom-left, .hud-bottom-right {
+            display:none;
+            position:absolute;
+            bottom:10px;
+            z-index:110;
+            gap:8px;
+            align-items:center;
+        }
+        .hud-bottom-left { left:10px; }
+        .hud-bottom-right { right:10px; }
+
+        .hud-bottom-left .panel, .hud-bottom-right .panel {
+            background: rgba(0,0,0,0.55);
+            padding:8px 10px;
+            border-radius:8px;
+            border:1px solid rgba(255,255,255,0.06);
+            font-weight:600;
+        }
+
+        .big-title { font-size:28px; margin-bottom:8px; }
+        .muted { opacity:0.9; font-size:14px; color:#ddd; }
+
+        /* 暫停 overlay 內按鈕分佈 */
+        .pause-controls { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin-top:8px; }
+
+        /* mobile-friendly adjustments */
+        @media (max-width:900px) {
+            .content { padding:12px; }
+            #gameWrapper { width:100%; aspect-ratio: 4/3; max-width: 900px; height: 72vh; }
+            .menu-btn { font-size:18px; padding:12px 22px; }
+            .menu-btn.secondary { font-size:16px; padding:10px 18px; }
+            .big-title { font-size:20px; }
+            .rules-box { font-size:15px; }
+            .hud-left { top:8px; left:8px; }
+            .hud-right { top:8px; right:8px; }
+
+            /* show bottom elements and hide top duplicates on mobile */
+            .hud-bottom-left, .hud-bottom-right { display:flex; }
+            .hud-left .panel.eaten-top { display:none; }    /* hide top '吃了' */
+            .hud-right .panel.lives-top { display:none; }   /* hide top '生命' */
+        }
+        @media (max-width:420px) {
+            #gameWrapper { height: 78vh; aspect-ratio: 3/4; }
+            .menu-btn { width: 92%; padding:14px; font-size:18px; border-radius:14px; }
+            .pause-controls { flex-direction:column; }
+            .rules-box { font-size:14px; }
+            .hud-right .panel button { padding:4px 7px; font-size:12px; }
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <button class="toggle-btn" onclick="toggleMenu()">☰</button>
+        <nav class="navbar" id="navbar">
+            <a href="{{ url_for('music') }}">音樂</a>
+            <a href="{{ url_for('game') }}">遊戲</a>
+            <a href="{{ url_for('learning') }}">學習</a>
+            <a href="{{ url_for('NLP') }}">語言</a>
+            <a href="{{ url_for('index') }}">主頁</a>
+        </nav>
+
         <div class="content">
-            <button class="toggle-btn" onclick="toggleMenu()">☰</button>
+            <div id="gameWrapper">
+                <canvas id="gameCanvas"></canvas>
 
-            <nav class="navbar" id="navbar">
-                <a href="{{ url_for('music') }}">音樂</a>
-                <a href="{{ url_for('game') }}">遊戲</a>
-                <a href="{{ url_for('learning') }}">學習</a>
-                <a href="{{ url_for('NLP') }}">語言</a>
-                <a href="{{ url_for('index') }}">主頁</a>
-            </nav>
+                <!-- HUD 左（桌機：分數 + 吃了top）-->
+                <div class="hud-left" id="hudLeft">
+                    <div class="panel">分數: <span id="score">0</span></div>
+                    <div class="panel eaten-top">吃了: <span id="eaten">0</span></div>
+                </div>
 
-            <div>
-                <h1>歡迎來到TING的AI網頁！此處還在製作中！</h1>
+                <!-- HUD 右上（桌機：生命top + 暫停按鈕）-->
+                <div class="hud-right" id="hudRight">
+                    <div class="panel lives-top">生命: <span id="lives">4</span></div>
+                    <div class="panel"><button id="pauseBtn">暫停</button></div>
+                </div>
+
+                <!-- 手機底部：生命（左下）與 吃了（右下），desktop 隱藏，mobile 顯示 -->
+                <div class="hud-bottom-left" id="hudBottomLeft">
+                    <div class="panel">生命: <span id="livesMobile">4</span></div>
+                </div>
+                <div class="hud-bottom-right" id="hudBottomRight">
+                    <div class="panel">吃了: <span id="eatenMobile">0</span></div>
+                </div>
+
+                <!-- Main Menu -->
+                <div class="overlay" id="mainMenu">
+                    <div>
+                        <h1 class="big-title">大魚吃小魚</h1>
+                        <p class="muted">控制小圓形去吃比你小的形狀，吃滿任意 3 個會長大一次。分數達 10000 分通關！</p>
+                    </div>
+                    <button id="startBtn" class="menu-btn big">開始</button>
+                    <button id="showRulesBtn" class="menu-btn secondary">遊戲規則</button>
+                </div>
+
+                <!-- Pause Overlay -->
+                <div class="overlay" id="pauseOverlay" style="display:none;">
+                    <div>
+                        <h2 class="big-title">遊戲已暫停</h2>
+                        <p class="muted">目前分數：<strong id="pauseScore">0</strong></p>
+                        <div class="pause-controls">
+                            <button id="pauseRulesBtn" class="menu-btn secondary">規則</button>
+                            <button id="pauseRestartBtn" class="menu-btn">重新</button>
+                            <button id="pauseResumeBtn" class="menu-btn">繼續</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rules Overlay -->
+                <div class="overlay" id="rulesOverlay" style="display:none;">
+                    <div class="rules-box">
+                        <h2>遊戲規則</h2>
+                        <ul>
+                            <li>主角是一個小圓形，起始於畫面中央，使用滑鼠或觸控移動主角到畫面任意位置。</li>
+                            <li>畫面會隨機產生圓形、正方形、三角形，每個形狀有大小。</li>
+                            <li>當你碰到比你「小」的形狀並吃掉它：視為成功，會得到分數。<br>
+                                - <strong>吃到較小的分數規則：</strong> 基礎得分 <strong>50 分</strong>，再依大小差值給予額外獎勵。</li><!-- （bonus = round((player.radius - shape.radius) * 2)） -->
+                            <li>若碰到比你「大（或等大）」的形狀：會被扣分。<br>
+                                - <strong>扣分數值：</strong> 每次扣 <strong>30 分</strong>（分數不得低於 0）。</li>
+                            <li>若你連續被扣分 <strong>2 次</strong>（即連續兩次碰到較大的形狀）則生命 -1。每次遊玩有 <strong>4 次生命</strong>。</li>
+                            <li>當你成功吃下任意 <strong>3 個</strong>形狀時，你會長大一次，吃掉會重置連續扣分的次數。</li>
+                            <li>分數達 <strong>10000 分</strong>即通關。</li>
+                        </ul>
+                        <div style="text-align:center; margin-top:10px;">
+                            <button id="closeRulesBtn" class="menu-btn secondary">關閉規則</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- End Overlay -->
+                <div class="overlay" id="endOverlay" style="display:none;">
+                    <div id="endMessage" style="margin-bottom:8px;">
+                        <h2 class="big-title" id="endTitle">遊戲結束</h2>
+                        <p>你的分數: <span id="finalScore">0</span></p>
+                    </div>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
+                        <button id="replayBtn" class="menu-btn">再玩一次</button>
+                        <button id="endRulesBtn" class="menu-btn secondary">規則</button>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
 
     <script>
-        function toggleMenu() {
-            var navbar = document.getElementById('navbar');
-            navbar.classList.toggle('show');
+    // ---- UI toggle ----
+    function toggleMenu(){ document.getElementById('navbar').classList.toggle('show'); }
+
+    // ---- DOM refs ----
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const mainMenu = document.getElementById('mainMenu');
+    const pauseOverlay = document.getElementById('pauseOverlay');
+    const rulesOverlay = document.getElementById('rulesOverlay');
+    const endOverlay = document.getElementById('endOverlay');
+
+    const startBtn = document.getElementById('startBtn');
+    const showRulesBtn = document.getElementById('showRulesBtn');
+    const closeRulesBtn = document.getElementById('closeRulesBtn');
+    const endRulesBtn = document.getElementById('endRulesBtn');
+    const replayBtn = document.getElementById('replayBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+
+    const pauseRulesBtn = document.getElementById('pauseRulesBtn');
+    const pauseRestartBtn = document.getElementById('pauseRestartBtn');
+    const pauseResumeBtn = document.getElementById('pauseResumeBtn');
+
+    const scoreEl = document.getElementById('score');
+    const eatenEl = document.getElementById('eaten');         // desktop eaten
+    const livesEl = document.getElementById('lives');         // desktop lives
+    const pauseScoreEl = document.getElementById('pauseScore');
+    const finalScoreEl = document.getElementById('finalScore');
+    const endTitleEl = document.getElementById('endTitle');
+
+    // mobile duplicates
+    const eatenMobileEl = document.getElementById('eatenMobile');
+    const livesMobileEl = document.getElementById('livesMobile');
+
+    // ---- canvas sizing ----
+    function resizeCanvas(){
+        const wrapper = document.getElementById('gameWrapper').getBoundingClientRect();
+        const w = Math.floor(wrapper.width * devicePixelRatio);
+        const h = Math.floor(wrapper.height * devicePixelRatio);
+        canvas.width = w;
+        canvas.height = h;
+        ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+
+        // clamp player after resize to ensure still inside new bounds
+        clampPlayerPosition();
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    // ---- game state & settings ----
+    let gameRunning = false;
+    let paused = false;
+    let returnToOverlay = null; // used when opening rules (where to return: 'main','pause','end')
+
+    const player = { x:0, y:0, radius:18, color:'#66ccff', speed:0.15 };
+    let mouse = { x:null, y:null };
+    let shapes = [];
+    let lastSpawn = 0;
+    let spawnInterval = 900;
+    let score = 0;
+    let eatenCount = 0;
+    let lives = 4;
+    let consecPenalties = 0;
+    let lastTime = performance.now();
+
+    // tuned params
+    const MAX_SCORE_TO_WIN = 10000;
+    const GROW_AFTER = 3;
+    const PENALTY_SCORE = 30;
+    const BASE_EAT_SCORE = 50;
+    const BONUS_MULTIPLIER = 2;
+    const CONSEC_PENALTY_THRESHOLD = 2;
+    const SPAWN_MIN_RADIUS = 6;
+    const SPAWN_MAX_RADIUS = 40;
+
+    function rand(min,max){ return Math.random()*(max-min)+min; }
+    function randInt(min,max){ return Math.floor(rand(min,max+1)); }
+    function choose(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+    function spawnShape(){
+        const type = choose(['circle','square','triangle']);
+        const wrapper = document.getElementById('gameWrapper').getBoundingClientRect();
+        const w = wrapper.width, h = wrapper.height;
+        const r = rand(SPAWN_MIN_RADIUS, SPAWN_MAX_RADIUS);
+        const x = rand(r, w - r);
+        const y = rand(r, h - r);
+        const angle = rand(0, Math.PI*2);
+        const speed = rand(0.25, 1.4) * (1 + Math.min(1, score/400));
+        const vx = Math.cos(angle) * speed;
+        const vy = Math.sin(angle) * speed;
+        shapes.push({ id: Math.random().toString(36).slice(2,9), type, x, y, vx, vy, radius: r, color: `hsl(${randInt(0,360)},70%,60%)`, createdAt: performance.now() });
+    }
+
+    function distance(a,b){
+        const dx = a.x - b.x, dy = a.y - b.y;
+        return Math.sqrt(dx*dx + dy*dy);
+    }
+
+    // clamp player inside current gameWrapper bounds (account for player.radius)
+    function clampPlayerPosition() {
+        try {
+            const rect = document.getElementById('gameWrapper').getBoundingClientRect();
+            // if rect width/height are 0 (not yet rendered), skip
+            if (!rect || rect.width <= 0 || rect.height <= 0) return;
+            // ensure player.x/y defined
+            if (typeof player.x !== 'number') player.x = rect.width/2;
+            if (typeof player.y !== 'number') player.y = rect.height/2;
+            player.x = Math.max(player.radius, Math.min(rect.width - player.radius, player.x));
+            player.y = Math.max(player.radius, Math.min(rect.height - player.radius, player.y));
+        } catch (e) {
+            // ignore
         }
+    }
+
+    function updateHUD(){
+        // update desktop elements
+        if (scoreEl) scoreEl.textContent = score;
+        if (eatenEl) eatenEl.textContent = eatenCount;
+        if (livesEl) livesEl.textContent = lives;
+        // update mobile duplicates if exist
+        const eMobile = document.getElementById('eatenMobile');
+        if (eMobile) eMobile.textContent = eatenCount;
+        const lMobile = document.getElementById('livesMobile');
+        if (lMobile) lMobile.textContent = lives;
+    }
+
+    function onEat(shape){
+        if (shape.radius < player.radius - 0.5) {
+            const bonus = Math.max(0, Math.round((player.radius - shape.radius) * BONUS_MULTIPLIER));
+            score += BASE_EAT_SCORE + bonus;
+            eatenCount += 1;
+            consecPenalties = 0;
+            if (eatenCount >= GROW_AFTER) {
+                eatenCount = 0;
+                player.radius += 6;
+                // clamp after growing so player won't extend beyond bounds
+                clampPlayerPosition();
+            }
+        } else {
+            score = Math.max(0, score - PENALTY_SCORE);
+            consecPenalties += 1;
+            if (consecPenalties >= CONSEC_PENALTY_THRESHOLD) {
+                lives = Math.max(0, lives - 1);
+                consecPenalties = 0;
+                if (lives <= 0) endGame('dead');
+            }
+        }
+        shapes = shapes.filter(s => s.id !== shape.id);
+        updateHUD();
+        if (score >= MAX_SCORE_TO_WIN) endGame('win');
+    }
+
+    function drawShape(s){
+        ctx.save();
+        ctx.translate(s.x, s.y);
+        if (s.type === 'circle') {
+            ctx.beginPath(); ctx.fillStyle = s.color; ctx.globalAlpha = 0.95; ctx.arc(0,0, s.radius,0,Math.PI*2); ctx.fill();
+        } else if (s.type === 'square') {
+            ctx.beginPath(); ctx.fillStyle = s.color; ctx.rect(-s.radius, -s.radius, s.radius*2, s.radius*2); ctx.fill();
+        } else if (s.type === 'triangle') {
+            ctx.beginPath(); ctx.fillStyle = s.color; ctx.moveTo(0, -s.radius); ctx.lineTo(s.radius, s.radius); ctx.lineTo(-s.radius, s.radius); ctx.closePath(); ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    function updateFrame(now){
+        if (!gameRunning) return;
+        if (paused) { lastTime = now; requestAnimationFrame(updateFrame); return; }
+        const dt = now - lastTime; lastTime = now;
+
+        if (now - lastSpawn > spawnInterval) { spawnShape(); spawnInterval = Math.max(350, spawnInterval - 6); lastSpawn = now; }
+
+        const wrapper = document.getElementById('gameWrapper').getBoundingClientRect();
+        const w = wrapper.width, h = wrapper.height;
+        for (let s of shapes){
+            s.x += s.vx * (dt * 0.06);
+            s.y += s.vy * (dt * 0.06);
+            if (s.x - s.radius < 0) { s.x = s.radius; s.vx *= -1; }
+            if (s.x + s.radius > w) { s.x = w - s.radius; s.vx *= -1; }
+            if (s.y - s.radius < 0) { s.y = s.radius; s.vy *= -1; }
+            if (s.y + s.radius > h) { s.y = h - s.radius; s.vy *= -1; }
+        }
+
+        if (mouse.x !== null && mouse.y !== null) {
+            const rect = canvas.getBoundingClientRect();
+            const targetX = mouse.x - rect.left;
+            const targetY = mouse.y - rect.top;
+            player.x += (targetX - player.x) * Math.min(1, player.speed * (dt*0.05));
+            player.y += (targetY - player.y) * Math.min(1, player.speed * (dt*0.05));
+            // clamp after following input
+            clampPlayerPosition();
+        }
+
+        const p = { x: player.x, y: player.y, radius: player.radius };
+        for (let i = shapes.length - 1; i >= 0; i--){
+            const s = shapes[i];
+            const dist = distance(p, s);
+            const margin = 0.5;
+            if (dist < p.radius + s.radius - margin) {
+                onEat(s);
+            }
+        }
+
+        // draw
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        ctx.save();
+        for (let s of shapes) drawShape(s);
+
+        // draw player
+        ctx.beginPath(); ctx.fillStyle = player.color; ctx.globalAlpha = 0.95; ctx.arc(player.x, player.y, player.radius, 0, Math.PI*2); ctx.fill();
+        // eye
+        ctx.beginPath(); ctx.fillStyle = 'rgba(0,0,0,0.6)'; const eyeX = player.x + Math.min(6, player.radius/2); const eyeY = player.y - Math.min(6, player.radius/3);
+        ctx.arc(eyeX, eyeY, Math.max(2, Math.min(4, player.radius*0.13)), 0, Math.PI*2); ctx.fill();
+
+        ctx.restore();
+
+        requestAnimationFrame(updateFrame);
+    }
+
+    // ---- game controls ----
+    function startGame(){
+        shapes = []; lastSpawn = performance.now(); spawnInterval = 900;
+        score = 0; eatenCount = 0; lives = 4; consecPenalties = 0; player.radius = 18;
+        const rect = document.getElementById('gameWrapper').getBoundingClientRect();
+        player.x = rect.width/2; player.y = rect.height/2;
+        // clamp to ensure inside after start
+        clampPlayerPosition();
+        updateHUD();
+
+        gameRunning = true; paused = false;
+        mainMenu.style.display = 'none'; pauseOverlay.style.display = 'none'; rulesOverlay.style.display = 'none'; endOverlay.style.display = 'none';
+        lastTime = performance.now();
+        resizeCanvas();
+
+        // ensure pause button returns to "暫停" on restart
+        pauseBtn.textContent = '暫停';
+
+        requestAnimationFrame(updateFrame);
+    }
+
+    function pauseGame(showOverlay = true){
+        paused = true;
+        pauseBtn.textContent = '繼續';
+        if (showOverlay) {
+            pauseScoreEl.textContent = score;
+            pauseOverlay.style.display = 'flex';
+        }
+    }
+
+    function resumeGame(){
+        paused = false;
+        pauseBtn.textContent = '暫停';
+        pauseOverlay.style.display = 'none';
+    }
+
+    function endGame(reason){
+        gameRunning = false;
+        finalScoreEl.textContent = score;
+        if (reason === 'win') endTitleEl.textContent = '恭喜通關！你贏了 🎉';
+        else endTitleEl.textContent = '遊戲結束';
+        endOverlay.style.display = 'flex';
+
+        // ensure pause button text reset
+        pauseBtn.textContent = '暫停';
+    }
+
+    // ---- events binding ----
+    startBtn.addEventListener('click', () => { startGame(); });
+    showRulesBtn.addEventListener('click', () => { mainMenu.style.display='none'; returnToOverlay='main'; rulesOverlay.style.display='flex'; });
+    closeRulesBtn.addEventListener('click', () => {
+        rulesOverlay.style.display = 'none';
+        if (returnToOverlay === 'pause') { pauseOverlay.style.display = 'flex'; pauseBtn.textContent='繼續'; }
+        else if (returnToOverlay === 'end') { endOverlay.style.display = 'flex'; }
+        else { mainMenu.style.display = 'flex'; }
+        returnToOverlay = null;
+    });
+
+    endRulesBtn.addEventListener('click', () => { endOverlay.style.display='none'; returnToOverlay='end'; rulesOverlay.style.display='flex'; });
+    replayBtn.addEventListener('click', () => { startGame(); });
+    pauseBtn.addEventListener('click', () => {
+        if (!gameRunning) return;
+        if (!paused) { pauseGame(true); returnToOverlay = 'pause'; }
+        else { resumeGame(); returnToOverlay = null; }
+    });
+
+    // pause overlay controls
+    pauseRulesBtn.addEventListener('click', () => { pauseOverlay.style.display='none'; returnToOverlay='pause'; rulesOverlay.style.display='flex'; });
+    pauseRestartBtn.addEventListener('click', () => {
+        // restart: start new game and ensure pause button text reset
+        startGame();
+    });
+    pauseResumeBtn.addEventListener('click', () => { resumeGame(); });
+
+    // end overlay replay handled above
+
+    // mouse / touch
+    canvas.addEventListener('mousemove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
+    canvas.addEventListener('touchmove', (e) => {
+        const t = e.touches[0]; mouse.x = t.clientX; mouse.y = t.clientY; e.preventDefault();
+    }, {passive:false});
+    canvas.addEventListener('mouseleave', () => { /* keep coords */ });
+
+    // quick tap to start when menu up
+    canvas.addEventListener('click', (e) => { if (!gameRunning && mainMenu.style.display !== 'none') startGame(); });
+
+    // keyboard small nudges (backup) & Esc toggle pause
+    window.addEventListener('keydown', (e) => {
+        if (!gameRunning) return;
+        if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+            const step = 10;
+            if (e.key === 'ArrowUp') player.y -= step;
+            if (e.key === 'ArrowDown') player.y += step;
+            if (e.key === 'ArrowLeft') player.x -= step;
+            if (e.key === 'ArrowRight') player.x += step;
+            // clamp after keyboard nudge
+            clampPlayerPosition();
+        }
+        if (e.key === 'Escape') {
+            if (!paused) { pauseGame(true); returnToOverlay='pause'; }
+            else resumeGame();
+        }
+    });
+
+    // resize and initial pos
+    window.addEventListener('load', () => {
+        setTimeout(() => {
+            resizeCanvas();
+            const rect = document.getElementById('gameWrapper').getBoundingClientRect();
+            player.x = rect.width/2; player.y = rect.height/2;
+            clampPlayerPosition();
+        }, 50);
+    });
+
+    // init HUD
+    updateHUD();
     </script>
 </body>
 </html>
