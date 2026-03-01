@@ -8,4 +8,7 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.10
+      # HF_API_KEY 設為 secret（不要把實際 key 寫在 repo）
+      - key: HF_API_KEY
+        sync: false
 
