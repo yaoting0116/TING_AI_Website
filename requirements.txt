@@ -1,3 +1,7 @@
 Flask
 gunicorn
 Jinja2
+python-dotenv
+requests
+flask-cors
+openai
