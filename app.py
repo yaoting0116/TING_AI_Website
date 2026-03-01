@@ -160,7 +160,7 @@ def api_chat():
         completion = client.chat.completions.create(
             model=model_to_use,
             messages=outgoing,
-            max_tokens=1000,
+            #max_tokens=1000,
         )
 
         # 取出回覆（視 library 回傳結構）
